@@ -1,0 +1,97 @@
+---
+## updatenagios.yml
+## version 0.1
+## Written for Ubuntu, Nagios, and Apache2. Tested on Ubuntu Server 16.04.03 and 17.04. Tested with Nagios 4.3.4. Tested with Apache 2.4.18-2ubuntu3.4 and Apache 2.4.25-3ubuntu2.2
+## The goal is to find the latest version of Nagios from GitHub tags, download that version from the Nagios website, compile, install, and configure it.
+## This is my first-and-a-half 'real' Ansible task, so I've probably done a lot incorrectly. Please don't run this; it's bound to break something.
+
+
+
+- name: Checking current Nagios version number
+  become: true
+  shell: /usr/local/nagios/bin/nagios --help | head -n2 | tail -n1 | awk -F ' ' '{print $3}'
+  register: nagiosCurrentVersion
+
+- name: Find the latest version of Nagios from its GitHub repo
+  shell: "git ls-remote --tags git://github.com/NagiosEnterprises/nagioscore.git | awk -F '-' '{ print $2 }' | sort | tail -n 1"
+  register: latestNagiosVersionOutput
+#- debug: msg="{{latestNagiosVersionOutput.stdout}}"
+
+- name: Save that version number as a variable
+  set_fact: 
+    latestNagiosVersion: "{{latestNagiosVersionOutput.stdout}}"
+#- debug: msg="{{latestNagiosVersion}}"
+
+- name: Do you actually need to update?
+  {{ ansible_distribution_version | version_compare('12.04', '>=') }}
+
+
+- name: Stop Nagios if running
+  become: true
+  shell: systemctl stop nagios.service
+- name: Ask systemD if Nagios is active
+  shell: systemctl is-active nagios.service || true
+  register: nagiossystemctlstatus
+- debug: msg="Nagios is {{nagiossystemctlstatus.stdout}}"
+
+- name: Stop Apache2 if running
+  become: true
+  shell: systemctl stop apache2.service
+- name: Ask systemD if Apache2 is active
+  shell: systemctl is-active apache2.service || true
+  register: apachesystemctlstatus
+- debug: msg="Apache2 is {{apachesystemctlstatus.stdout}}"
+
+- name: Remove any Nagios files from temp directory
+  shell: rm -rf /tmp/nagios-*
+
+- name: Download and extract the latest release of Nagios
+  unarchive:
+    src: https://assets.nagios.com/downloads/nagioscore/releases/nagios-{{latestNagiosVersion}}.tar.gz
+    dest: /tmp/
+    remote_src: yes
+
+- name: Install Nagios prerequisites
+  become: true
+  raw: apt-get install -qy autoconf gcc libc6 make wget unzip apache2 php libapache2-mod-php7.0 libgd2-xpm-dev build-essential libgd2-xpm-dev openssl libssl-dev xinetd apache2-utils unzip exim4-daemon-light mailutils
+
+
+
+- name: Configure Nagios
+  shell: cd /tmp/nagios-{{latestNagiosVersion}} && /tmp/nagios-{{latestNagiosVersion}}/configure --with-mail=/usr/bin/mail --with-nagios-group=nagios --with-command-group=nagcm
+  register: configuration
+- name: Configuration results
+  debug: msg="{{configuration.stdout[7000:]}}"
+
+- name: Compile Nagios
+  shell: cd /tmp/nagios-{{latestNagiosVersion}} && /usr/bin/make all
+  register: making
+- name: Make results
+  debug: msg="{{making.stdout[2800:]}}"
+
+- name: Install most of Nagios (This installs the main program, CGIs, and HTML files)
+  become: true
+  shell: cd /tmp/nagios-{{latestNagiosVersion}} && /usr/bin/make install
+
+- name: Install Nagios theme (This installs the Exfoliation theme for the Nagios web interface)
+  become: true
+  shell: cd /tmp/nagios-{{latestNagiosVersion}} && /usr/bin/make install-exfoliation
+
+
+- name: Restart Nagios
+  become: true
+  shell: systemctl restart nagios.service
+- name: Ask systemD if Nagios is active
+  shell: systemctl is-active nagios.service
+  register: nagiossystemctlstatus
+- debug: msg="Nagios is {{nagiossystemctlstatus.stdout}}"
+
+- name: Restart Apache2
+  become: true
+  shell: systemctl restart apache2.service
+- name: Ask systemD if Apache2 is active
+  shell: systemctl is-active apache2.service
+  register: apachesystemctlstatus
+- debug: msg="Apache2 is {{apachesystemctlstatus.stdout}}"
+
+...
