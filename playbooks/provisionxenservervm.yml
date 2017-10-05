@@ -1,0 +1,32 @@
+---
+# file: provisionxenservervm.yml
+
+- hosts: xenservers
+
+  vars_prompt:
+    - name: vmos
+      prompt: Which OS do you want to provision? Press "1" for Ubuntu Server 16.04, press "2" for Windows 2012r2
+      default: 1
+      private: no
+
+    - name: vmnumber
+      prompt: How many of these do you want to deploy?
+      default: 3
+      private: no
+
+    - name: vmname
+      prompt: What do you want to name these VMs?
+      default: aProv-Ubuntu
+      private: no
+
+    - name: vmcopy
+      prompt: . . . . . . . . . . . . . . . . . Finally, is this a temporary VM or a long-term thing? I ask because there are two ways to make a VM from a template. I can do a fast setup (1 min each) which will make a terribly laggy VM forever, or I could do a safe setup (60 min each) to give you a healthy VM forever. So tell me... do you want it "fast" or "safe"?
+      default: safe
+      private: no
+
+
+
+  roles:
+#    - { role: ansibleprep }
+    - { role: provisionxenservervm}
+...
