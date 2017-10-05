@@ -1,0 +1,50 @@
+---
+# provisionxenservervm
+
+
+
+############
+## Ubuntu ##
+############
+- name: Convert your Ubuntu 16.04 VM OS selection to actual UUID strings for a XenServer in the Testing Pool
+  set_fact:
+    templateUUID: "463ec5f7-377c-ebba-1f5c-b291629d8f59"
+  when: ("'testxenservers' in group_names") and (vmos == "1")
+
+- name: Convert your Ubuntu 16.04 VM OS selection to actual UUID strings for a XenServer in the Production Pool
+  set_fact:
+    templateUUID: "5e389cb2-be5f-a15f-5651-1457fdcd4909"
+  when: ("'productionxenservers' in group_names") and (vmos == "1")
+
+
+
+#############
+## Windows ##
+#############
+- name: Convert your Windows 2012r2 VM OS selection to actual UUID strings for a XenServer in the Testing Pool
+  set_fact:
+    templateUUID: "a3cb456c-0fbc-fcb6-21c3-c34978d9e422"
+  when: ("'testxenservers' in group_names") and (vmos == "2")
+
+- name: Convert your Windows 2012r2 VM OS selection to actual UUID strings for a XenServer in the Production Pool
+  set_fact:
+    templateUUID: "64b84d37-6c8e-1914-8be0-1a5c61ac3f9f"
+  when: ("'productionxenservers' in group_names") and (vmos == "2")
+
+
+  
+#################
+## Actually do ##
+## the cloning ##
+#################
+- name: Fast clone Ubuntu VM from template
+  shell: xe vm-clone new-name-label="{{item}}" vm={{templateUUID}}
+  with_sequence: count={{vmnumber}} format={{vmname}}%02x
+  when: "'fast' in vmcopy"
+
+- name: Safe Clone Ubuntu VM from template. This will take about 60 minutes for each vm.
+  shell: xe vm-copy new-name-label="{{item}}" vm={{templateUUID}}    # sr-uuid=eb749cca-8fc4-edcb-9831-78d17351055e 
+  with_sequence: count={{vmnumber}} format={{vmname}}%02x
+  when: "'safe' in vmcopy"
+
+...
