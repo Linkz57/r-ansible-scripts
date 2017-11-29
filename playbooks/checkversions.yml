@@ -1,0 +1,23 @@
+---
+# file: checkversions.yml
+
+- hosts: linux
+#  gather_facts: False
+
+  vars_prompt:
+    - name: sware
+      prompt: What software should I check the version number of?
+      default: exim4
+      private: no
+
+    - name: svers
+      prompt: What version number are you looking for? I won't do math, only what GREP can handle.
+      default: 4.88\|4.89
+      private: no
+
+
+  roles:
+#    - { role: ansibleprep }
+    - { role: checkversions }
+    
+...
