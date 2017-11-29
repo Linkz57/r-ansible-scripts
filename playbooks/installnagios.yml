@@ -1,0 +1,14 @@
+---
+# file: installnagios.yml
+
+- hosts: ubuntu
+  become_method: sudo
+
+
+  roles:
+    - { role: ansibleprep }
+    - { role: reboot }
+    - { role: aptupgrade }
+    - { role: reboot }
+    - { role: installnagios }
+...
