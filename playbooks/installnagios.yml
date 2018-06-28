@@ -3,12 +3,19 @@
 
 - hosts: ubuntu
   become_method: sudo
+  gather_facts: False
 
 
   roles:
+
     - { role: ansibleprep }
-    - { role: reboot }
     - { role: aptupgrade }
     - { role: reboot }
+    - { role: mountcifs }
     - { role: installnagios }
+
+  tasks:
+    - name: Unmount autobackups when done
+      become: true
+      shell: umount /mnt/autobackups
 ...
