@@ -1,12 +1,13 @@
 ---
 ## installnagios.yml
-## version 1.0
-## Written for Ubuntu, Nagios, and Apache2. Tested on Ubuntu Server 16.04.03 and 17.04. Tested with Nagios 4.3.4. Tested with Apache 2.4.18-2ubuntu3.4 and Apache 2.4.25-3ubuntu2.2
+## version 1.4
+## Written for Ubuntu, Nagios, and Apache2. Tested on Ubuntu Server 16.04.03, 17.04, and 18.04. Tested with Nagios 4.3.4 and 4.4.1. Tested with Apache 2.4.18-2ubuntu3.4, Apache 2.4.25-3ubuntu2.2, and 2.4.29-1ubuntu4.1
 ## The goal is to find the latest version of Nagios from GitHub tags, download that version from the Nagios website, compile, install, and configure it.
 ## This is my first 'real' Ansible task, so I've probably done a lot incorrectly. Please don't run this; it's bound to break something.
 - name: Set nagiosadmin password
   set_fact:
     nagiosadmin_pass: "{{ ansible_become_pass }}"
+    nagiosadmin_user: nagiosadmin
 ## Replace ansible_become_pass with whatever you want nagiosadmin's password to be. vault-encrypted variables are preferable, but plaintext will also work if you remove the {{ }}
 
 
@@ -19,7 +20,8 @@
 #       _______\/\\\________\///\\\__/\\\____\/\\\_______/\\\___\///\\\__/\\\__________  
 #        _______\/\\\__________\///\\\\\/_____\/\\\\\\\\\\\\/______\///\\\\\/______/\\\_ 
 #         _______\///_____________\/////_______\////////////__________\/////_______\///__
-## TODO: install and configure exim4 to actually send email
+## TODO: configure exim4 to actually send email
+## TODO: restore host definitions and libexec scripts from backup. Currently this doesn't work well.
 
 
 - name: Stop Nagios if running
@@ -48,7 +50,9 @@
 
 - name: Install Nagios prerequisites
   become: true
-  raw: apt-get install -qy git autoconf gcc libc6 make wget unzip apache2 php libapache2-mod-php7.0 libgd2-xpm-dev build-essential libgd2-xpm-dev openssl libssl-dev xinetd apache2-utils unzip exim4-daemon-light mailutils
+  raw: apt-get install -qy git autoconf gcc libc6 make wget unzip apache2 php libapache2-mod-php build-essential libgd-dev openssl libssl-dev xinetd apache2-utils unzip exim4-daemon-light mailutils
+  when: "'Debian' in ansible_os_family"
+  ## Maybe also install libgd2-xpm-dev
 
 - name: Find the latest version of Nagios from its GitHub repo
   shell: "git ls-remote --tags git://github.com/NagiosEnterprises/nagioscore.git | awk -F '-' '{ print $2 }' | sort | tail -n 1"
@@ -69,31 +73,45 @@
     dest: /tmp/
     remote_src: yes
 
-- name: Create user for Nagios
+- name: Create the Group "nagcmd" if it doesn't already exist
   become: true
-  shell: id -u nagios &>/dev/null || useradd nagios
+  group:
+    name: nagcmd
+    state: present
 
-- name: Create group for Nagios
+- name: Add the user "nagios" with the secondary groups "nagcmd" and "www-data" if it isn't such already
   become: true
-  shell: getent group nagcmd &>/dev/null || groupadd nagcmd
+  user:
+    name: nagios
+    comment: Account to run all Nagios code including SSHing as a part of script or plugins
+    groups: nagcmd,www-data
+    append: yes
+  when: "'Ubuntu' in ansible_distribution"
 
-- name: Add Nagios user to Nagios group
+- name: Add the user "nagios" with the secondary groups "nagcmd" and "apache if it isn't such already -- untested
   become: true
-  shell: usermod -a -G nagcmd nagios
+  user:
+    name: nagios
+    comment: Account to run all Nagios code including SSHing as a part of script or plugins
+    groups: nagcmd,www-data
+    append: yes
+  when: "'Debian' in ansible_distribution"
 
-#- name: Add Nagios group to web group... maybe
-#  become: true
-#  shell: usermod -a -G nagcmd www-data
-
-#- name: Add Nagios user to web group... maybe
-#  become: true
-#  shell: usermod -a -G www-data nagcmd
-
-- name: Add Nagios user to web group... maybe
+- name: Add the user "www-data" to the secondary group "nagcmd" if it isn't such already, so the web server can run Nagios commands.
   become: true
-  shell: usermod -a -G www-data nagios
+  user:
+    name: www-data
+    groups: nagcmd
+    append: yes
+  when: "'Ubuntu' in ansible_distribution"
 
-
+- name: Add the user "apache" to the secondary group "nagcmd" if it isn't such already, so the web server can run Nagios commands. -- untested
+  become: true
+  user:
+    name: apache
+    groups: nagcmd
+    append: yes
+  when: "'Debian' in ansible_distribution"
 
 - name: Configure Nagios
   shell: /tmp/nagios-{{latestNagiosVersion}}/configure --with-mail=/usr/bin/mail --with-nagios-group=nagios --with-command-group=nagcmd --with-httpd-conf=/etc/apache2/sites-enabled
@@ -131,9 +149,13 @@
   args:
     chdir: /tmp/nagios-{{latestNagiosVersion}}
 
+# - name: Set up Nagios init
+#   become: true
+#   shell: update-rc.d nagios defaults
+
 - name: Set up Nagios init
   become: true
-  shell: update-rc.d nagios defaults
+  shell: systemctl enable nagios
 
 - name: Install Nagios configs (This installs sample files to /usr/local/nagios/etc)
   become: true
@@ -167,9 +189,21 @@
   become: true
   shell: a2enmod rewrite
 
-- name: Set up nagios's nagiosadmin password. This will remove all Nagios users and add one user.
+- name: Set up nagios's nagiosadmin password. This will remove all Nagios users and add one user
   become: true
-  shell: echo {{ nagiosadmin_pass }} | htpasswd -ic /usr/local/nagios/etc/htpasswd.users nagiosadmin
+  shell: echo '{{ nagiosadmin_pass }}' | htpasswd -ic /usr/local/nagios/etc/htpasswd.users '{{ nagiosadmin_user }}'
+
+
+
+- name: Copy non-existant plugins and checks from backup -- edit this line for a fuller restoration from backup
+  become: true
+  shell: tar -zxkf /mnt/tempansible/$(ls -t /mnt/tempansible/ | head -n1)/nagios_backup_*.tar.gz usr/local/nagios/libexec
+  args:
+    chdir: /
+  when: "'Nagios' in mounted"
+  ignore_errors: yes
+  
+
 
 
 
@@ -188,5 +222,8 @@
   shell: systemctl is-active apache2.service
   register: apachesystemctlstatus
 - debug: msg="Apache2 is {{apachesystemctlstatus.stdout}}"
+
+- debug: msg="Installation finished. Log into http://{{ ansible_nodename }}/nagios with username {{ nagiosadmin_user }} and password {{ nagiosadmin_pass }}"
+- debug: msg="SSH in and run 'sudo dpkg-reconfigure exim4-config' to configure Nagios email."
 
 ...
