@@ -1,0 +1,37 @@
+---
+## mountcifs
+## version 1.0
+
+
+- name: Install mounting prerequisites
+  become: true
+  raw: apt-get install -qy cifs-utils
+  when: "'Debian' in ansible_os_family"
+
+- name: Load encrypted variables containing mounting credentials
+  include_vars:
+    file: vault
+
+- name: Unmount autobackups in case it's already mounted -- failure is expected
+  become: true
+  shell: umount /mnt/tempansible
+  ignore_errors: yes
+
+- name: Create mount point
+  become: true
+  file:
+    path: /mnt/tempansible
+    owner: root
+    group: root
+    mode: 0444
+    state: directory
+
+- name: Mount AutoBackups
+  become: true
+  shell: mount -t cifs '{{ mount_folder }}' /mnt/tempansible -o username='{{ mount_user }}',domain='{{ mount_domain }}',password='{{ mount_pass }}',ro,file_mode=0555,dir_mode=0555
+
+- name: Notify other roles that this is mounted
+  vars:
+    mounted: '{{ mount_folder }}'
+
+...
