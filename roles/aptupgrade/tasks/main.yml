@@ -1,0 +1,13 @@
+---
+
+- name: Update apt-cache
+  become: true
+  apt: update_cache=yes
+
+- name: Upgrade out of date packages
+  become: true
+  raw: apt-get upgrade -qy
+#  apt: cache_valid_time=10800
+#  apt: upgrade=yes
+
+...
