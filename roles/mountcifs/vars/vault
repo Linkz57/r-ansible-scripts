@@ -1,0 +1,5 @@
+vault_mount_user: secret
+vault_mount_pass: secret
+vault_mount_domain: secret
+vault_mount_folder: "//secret/secret/secret"
+## obviously you should shred this file and make a fresh one with the same name using the ansible-vault command and better passwords
