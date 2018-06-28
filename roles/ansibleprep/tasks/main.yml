@@ -1,0 +1,44 @@
+---
+#gather_facts: False
+#pre_tasks:
+
+- name: Figure out distro the hard way
+  raw: cat /etc/*release | grep NAME= | cut -d'=' -f2
+  register: distroOutput
+
+- name: Save distro as a variable
+  set_fact: 
+    distro: "{{distroOutput.stdout}}"
+
+- name: Figure out distro-like the hard way
+  raw: cat /etc/*release | grep ID_LIKE= | cut -d'=' -f2
+  register: distroLikeOutput
+
+- name: Save distro-like as a variable
+  set_fact: 
+    distroLike: "{{distroLikeOutput.stdout}}"
+
+- name: Ubuntu -- checking and maybe installing Python for Ansible
+  become: true
+  ignore_errors: yes
+  raw: sudo bash -c "test -e /usr/bin/python || (apt -qqy update && apt install -qy python-minimal)"
+  register: output
+  changed_when: 
+    - output.stdout != ""
+    - output.stdout != "\r\n"
+  when: ("'Ubuntu' in distro") or
+        ("'Ubuntu' in distroLike")
+
+- name: XenServer -- checking for Python for Ansible
+  raw: bash -c "test -e /usr/bin/python"
+  register: output
+  changed_when: 
+    - output.stdout != ""
+    - output.stdout != "\r\n"
+#  when: "'XenServer' in ansible_distribution"
+
+- name: Gathering facts
+  setup: # aka gather_facts
+- debug: msg="{{ ansible_nodename }} (via Gathered Facts from 'setup')"
+
+...
