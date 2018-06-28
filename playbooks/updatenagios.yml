@@ -1,0 +1,11 @@
+---
+# file: updatenagios.yml
+## Works fine alone, but pairs well with 
+## https://github.com/Linkz57/r-nagios-scripts/blob/master/checks/custom_check_for_updates_to_nagios.sh
+
+- hosts: nagios
+
+
+  roles:
+    - { role: updatenagios }
+...
