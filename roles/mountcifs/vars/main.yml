@@ -1,0 +1,5 @@
+mount_user: '{{ vault_mount_user }}'
+mount_pass: '{{ vault_mount_pass }}'
+mount_domain: '{{ vault_mount_domain }}'
+mount_folder: '{{ vault_mount_folder }}'
+## these variables are all defined as the varibales stored in an Ansible-vault encrypted file in this same folder.
