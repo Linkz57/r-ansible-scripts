@@ -1,6 +1,6 @@
 ---
 ## updatenagios.yml
-## version 1.4
+## version 1.4.1
 ## Written for Ubuntu, Nagios, and Apache2. Tested on Ubuntu Server 16.04.03 and 17.04. Tested with Nagios 4.3.4. Tested with Apache 2.4.18-2ubuntu3.4 and Apache 2.4.25-3ubuntu2.2
 ## The goal is to find the latest version of Nagios from GitHub tags, download that version from the Nagios website, compile, and install it.
 ## This is my first-and-a-half 'real' Ansible task, so I've probably done a lot incorrectly. Please don't run this; it's bound to break something.
@@ -14,7 +14,8 @@
 # - debug: msg="{{nagiosCurrentVersion.stdout}}"
 
 - name: Find the latest version of Nagios from its GitHub repo
-  shell: "git ls-remote --tags git://github.com/NagiosEnterprises/nagioscore.git | awk -F '-' '{ print $2 }' | sort | tail -n 1"
+#  shell: "git ls-remote --tags git://github.com/NagiosEnterprises/nagioscore.git | awk -F '-' '{ print $2 }' | grep 4.3.4"
+  shell: "git ls-remote --tags git://github.com/NagiosEnterprises/nagioscore.git | awk -F '-' '{ print $2 }' | grep -v "\^" | sort -h | tail -n 1"
   register: latestNagiosVersionOutput
 #- debug: msg="{{latestNagiosVersionOutput.stdout}}"
 
