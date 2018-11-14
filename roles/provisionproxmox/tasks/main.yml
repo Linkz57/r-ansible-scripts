@@ -1,0 +1,43 @@
+---
+## provisionproxmox
+## This should help significantly in testing our backups
+
+
+- name: Create new '{{virtual_object_os_friendly_name}}' '{{virtual_object_type}}' on '{{proxmox_node}}'
+  debug:
+    msg:
+      - "Create new {{virtual_object_os_friendly_name}} {{virtual_object_type}} on {{proxmox_api_host}}"
+
+- name: create containers
+  register: create
+  with_items:
+    - '{{vmid}}'
+  ## Thanks to Evens SOLIGNAC for the "with_items" idea
+  ## https://github.com/slgevens/proxmox-ansible
+  proxmox:
+    node: '{{proxmox_node}}'
+    api_user: '{{proxmox_username}}@pam'
+    api_password: '{{proxmox_api_pass}}'
+    api_host: '{{proxmox_api_host}}'
+    validate_certs: '{{legit_certs}}'
+    #password: '{{virtual_object_pass}}'
+    vmid: '{{item}}'
+    hostname: '{{virtual_object_hostname}}-{{item}}'
+    #netif: '{"net0":"name=eth0,gw={{virtual_object_network_gateway}},ip={{virtual_object_network_address_and_mask}},bridge=vmbr0"}'
+    ostemplate: '{{virtual_object_source_nas}}:{{virtual_object_source_installer}}'
+    #mounts: '{"mp0":"local-zfs:8,mp=/mnt/test/"}'
+    ## mounts not necessary?
+    cores: 1
+    cpus: 1
+    #cpuunits: 1000
+    disk: 8
+    memory: 512
+    swap: 512
+    unprivileged: '{{unprivileged_container}}'
+    #ip_address: '{{virtual_object_network_address}}
+    storage: local-zfs
+  when: "'container' in virtual_object_type"
+
+- debug: { var: create.msg }
+
+...
