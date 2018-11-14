@@ -1,0 +1,8 @@
+---
+proxmox_api_pass: '{{vault_proxmox_api_pass}}'
+proxmox_api_host: '{{proxmox_node}}.FQDN.biz'
+virtual_object_network_gateway: 10.0.0.1
+#virtual_object_network_mask: 24
+vmid: [301,302,303]
+## vmid will be made dynamic later. Always being these 3 is no fun.
+...
