@@ -1,0 +1,47 @@
+---
+## convert_human_to_proxmox
+## Take human-friendly selections and convert them to something Proxmox can understand.
+
+
+################
+## NAS Source ##
+################
+- name: Decide on NAS source by Virtual Object type - vm
+  set_fact:
+    virtual_object_source_nas: nas1-isos
+  when: virtual_object_type == 'vm'
+
+- name: Decide on NAS source by Virtual Object type - container
+  set_fact:
+    virtual_object_source_nas: nas3-container_templates
+  when: virtual_object_type == 'container'
+
+
+
+############
+## Ubuntu ##
+############
+- name: Convert selection number to human-friendly name
+  set_fact:
+    virtual_object_os_friendly_name: "Ubuntu 18.04"
+  when: virtual_object_os == '1'
+
+- name: Convert your Ubuntu 18.04 container OS selection to actual install media
+  set_fact:
+    virtual_object_source_installer: "vztmpl/ubuntu-18.04-standard_18.04-1_amd64.tar.gz"
+  when: (virtual_object_type == "container") and (virtual_object_os == "1")
+
+- name: Convert your Ubuntu 18.04 VM OS selection to actual install media
+  set_fact:
+    virtual_object_source_installer: "iso/ubuntu-mini-18.04.iso"
+  when: (virtual_object_type == "vm") and (virtual_object_os == "1")
+
+
+
+#############
+## Windows ##
+#############
+
+## eventually...
+
+...
