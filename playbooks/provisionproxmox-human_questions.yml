@@ -1,0 +1,73 @@
+---
+# file: provisionproxmox-human_questions.yml
+
+- hosts: me
+  #debugger: on_failed
+  #debugger: always
+#  become_method: sudo
+#  gather_facts: False
+
+
+
+
+  vars_prompt:
+    - name: virtual_object_os
+      prompt: Which OS do you want to provision? Only Ubuntu 18.04 (choice 1) is supported right now.
+      default: 1
+      private: no
+
+    - name: vmnumber
+      prompt: How many of these do you want to deploy?
+      default: 3
+      private: no
+
+    - name: virtual_object_hostname
+      prompt: What do you want to name these VMs?
+      default: aProv-Ubuntu
+      private: no
+
+    - name: virtual_object_disk_size
+      prompt: How many Gigs of disk space do you want? You can always grow this later, but not easily shrink.
+      default: 10
+      private: no
+
+    - name: virtual_object_type
+      prompt: Do you want a full vm or just a container? vm is not supported yet.
+      default: container
+      private: no
+
+    - name: unprivileged_container
+      prompt: If a container, an unprivileged container? This increases security. type yes or no
+      default: yes
+      private: no
+      when: "'container' in virtual_object_type"
+
+    - name: proxmox_node
+      prompt: Which node do you want to deploy this on? Later I'll add auto load-based allocation.
+      default: teddsproxmoxbox
+      private: no
+
+    - name: virtual_object_pass
+      prompt: What do you want the root password to be on this new box?
+      default: password
+      private: yes
+
+    - name: virtual_object_network_address_and_mask
+      prompt: What's the IP address and CIDR mask? We should really be using DHCP for this, especially because I don't yet know how to incriment this address when spinning up muliple instances.
+      default: 10.0.0.1/24
+      private: no
+      ## robots will skip this bit and use DHCP on an isolated testing network/VLAN
+
+
+  # tasks:
+  #   - debug: msg="virtual_object_type is {{virtual_object_type}}"
+
+
+  roles:
+
+#    - { role: ansibleprep }
+#    - { role: aptupgrade }
+    - { role: convert_human_to_proxmox }
+    - { role: provisionproxmox }
+
+...
