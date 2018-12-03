@@ -18,30 +18,215 @@
 
 
 
-############
-## Ubuntu ##
-############
+##################
+## Ubuntu 18.04 ##
+##################
 - name: Convert selection number to human-friendly name
   set_fact:
     virtual_object_os_friendly_name: "Ubuntu 18.04"
+    virtual_object_os_friendly_name_no_space: "Ubuntu1804"
   when: virtual_object_os == '1'
 
-- name: Convert your Ubuntu 18.04 container OS selection to actual install media
+- name: Convert your {{virtual_object_os_friendly_name}} {{virtual_object_type}} OS selection to actual install media
   set_fact:
     virtual_object_source_installer: "vztmpl/ubuntu-18.04-standard_18.04-1_amd64.tar.gz"
   when: (virtual_object_type == "container") and (virtual_object_os == "1")
 
-- name: Convert your Ubuntu 18.04 VM OS selection to actual install media
+- name: Convert your {{virtual_object_os_friendly_name}} {{virtual_object_type}} OS selection to actual install media
   set_fact:
     virtual_object_source_installer: "iso/ubuntu-mini-18.04.iso"
   when: (virtual_object_type == "vm") and (virtual_object_os == "1")
 
 
 
-#############
-## Windows ##
-#############
 
-## eventually...
 
+##################
+## Ubuntu 16.04 ##
+##################
+- name: Convert selection number to human-friendly name
+  set_fact:
+    virtual_object_os_friendly_name: "Ubuntu 16.04"
+    virtual_object_os_friendly_name_no_space: "Ubuntu1604"
+  when: virtual_object_os == '2'
+
+- name: Convert your {{virtual_object_os_friendly_name}} {{virtual_object_type}} OS selection to actual install media
+  set_fact:
+    virtual_object_source_installer: "vztmpl/ubuntu-16.04-standard_16.04-1_amd64.tar.gz"
+  when: (virtual_object_type == "container") and (virtual_object_os == "2")
+
+- name: Convert your {{virtual_object_os_friendly_name}} {{virtual_object_type}} OS selection to actual install media
+  set_fact:
+    virtual_object_source_installer: "iso/ubuntu-16.04.1-server-amd64.iso"
+  when: (virtual_object_type == "vm") and (virtual_object_os == "2")
+
+
+
+
+
+##############
+## Debian 9 ##
+##############
+- name: Convert selection number to human-friendly name
+  set_fact:
+    virtual_object_os_friendly_name: "Debian 9"
+    virtual_object_os_friendly_name_no_space: "Debian9"
+  when: virtual_object_os == '10'
+
+- name: Convert your {{virtual_object_os_friendly_name}} {{virtual_object_type}} OS selection to actual install media
+  set_fact:
+    virtual_object_source_installer: "vztmpl/debian-9.0-standard_9.5-1_amd64.tar.gz"
+  when: (virtual_object_type == "container") and (virtual_object_os == "10")
+
+- name: Convert your {{virtual_object_os_friendly_name}} {{virtual_object_type}} OS selection to actual install media
+  set_fact:
+    virtual_object_source_installer: "iso/debian-9.6.0-amd64-netinst.iso"
+  when: (virtual_object_type == "vm") and (virtual_object_os == "10")
+
+
+
+
+
+
+##############
+## CentOS 7 ##
+##############
+- name: Convert selection number to human-friendly name
+  set_fact:
+    virtual_object_os_friendly_name: "CentOS 7"
+    virtual_object_os_friendly_name_no_space: "CentOS7"
+  when: virtual_object_os == '20'
+
+- name: Convert your {{virtual_object_os_friendly_name}} {{virtual_object_type}} OS selection to actual install media
+  set_fact:
+    virtual_object_source_installer: "vztmpl/centos-7-default_20171212_amd64.tar.xz"
+  when: (virtual_object_type == "container") and (virtual_object_os == "20")
+
+- name: Convert your {{virtual_object_os_friendly_name}} {{virtual_object_type}} OS selection to actual install media
+  set_fact:
+    virtual_object_source_installer: "iso/CentOS-7-x86_64-Minimal-1804.iso"
+  when: (virtual_object_type == "vm") and (virtual_object_os == "20")
+  
+
+
+
+
+########################
+## OpenSUSE 15 - Leap ##
+########################
+- name: Convert selection number to human-friendly name
+  set_fact:
+    virtual_object_os_friendly_name: "OpenSUSE 15 Leap"
+    virtual_object_os_friendly_name_no_space: "OpenSuse15leap"
+  when: virtual_object_os == '30'
+
+- name: Convert your {{virtual_object_os_friendly_name}} {{virtual_object_type}} OS selection to actual install media
+  set_fact:
+    virtual_object_source_installer: "vztmpl/opensuse-15.0-default_20180907_amd64.tar.xz"
+  when: (virtual_object_type == "container") and (virtual_object_os == "30")
+
+- name: Convert your {{virtual_object_os_friendly_name}} {{virtual_object_type}} OS selection to actual install media
+  set_fact:
+    virtual_object_source_installer: "iso/openSUSE-Leap-15.1-DVD-x86_64-Build297.3-Media.iso"
+  when: (virtual_object_type == "vm") and (virtual_object_os == "30")
+
+
+
+
+##############################
+## OpenSUSE 15 - Timbleweed ##
+##############################
+- name: Convert selection number to human-friendly name
+  set_fact:
+    virtual_object_os_friendly_name: "OpenSUSE 15 Tumbleweed"
+    virtual_object_os_friendly_name_no_space: "OpenSuse15tumbleweed"
+  when: virtual_object_os == '31'
+
+- name: Convert your {{virtual_object_os_friendly_name}} {{virtual_object_type}} OS selection to actual install media
+  set_fact:
+    virtual_object_source_installer: "vztmpl/opensuse-15-default_20180907_amd64.tar.xz"
+  when: (virtual_object_type == "container") and (virtual_object_os == "31")
+
+- name: Convert your {{virtual_object_os_friendly_name}} {{virtual_object_type}} OS selection to actual install media
+  set_fact:
+    virtual_object_source_installer: "iso/openSUSE-Tumbleweed-NET-x86_64-Snapshot20181001-Media.iso"
+  when: (virtual_object_type == "vm") and (virtual_object_os == "31")
+
+
+
+
+
+
+#############
+## Mint 19 ##
+#############
+- name: Convert selection number to human-friendly name
+  set_fact:
+    virtual_object_os_friendly_name: "Mint 19"
+    virtual_object_os_friendly_name_no_space: "Mint19"
+  when: virtual_object_os == '40'
+
+# - name: Convert your Mint 19 container OS selection to actual install media
+#   set_fact:
+#     virtual_object_source_installer: "vztmpl/opensuse-15-default_20180907_amd64.tar.xz"
+#   when: (virtual_object_type == "container") and (virtual_object_os == "40")
+
+- name: Convert your {{virtual_object_os_friendly_name}} {{virtual_object_type}} OS selection to actual install media
+  set_fact:
+    virtual_object_source_installer: "iso/linuxmint-19-cinnamon-64bit.iso"
+  when: (virtual_object_type == "vm") and (virtual_object_os == "40")
+
+
+
+
+
+##################
+## Windows 2016 ##
+##################
+- name: Convert selection number to human-friendly name
+  set_fact:
+    virtual_object_os_friendly_name: "Windows 2016"
+    virtual_object_os_friendly_name_no_space: "Windows2016"
+  when: virtual_object_os == '80'
+
+- name: Convert your {{virtual_object_os_friendly_name}} {{virtual_object_type}} OS selection to actual install media
+  set_fact:
+    virtual_object_source_installer: "iso/Windows_Server_2016_x64.ISO"
+  when: (virtual_object_type == "vm") and (virtual_object_os == "80")
+
+
+
+
+##################
+## Windows 2016 ##
+##################
+- name: Convert selection number to human-friendly name
+  set_fact:
+    virtual_object_os_friendly_name: "Windows 10"
+    virtual_object_os_friendly_name_no_space: "Windows10"
+  when: virtual_object_os == '80'
+
+- name: Convert your {{virtual_object_os_friendly_name}} {{virtual_object_type}} OS selection to actual install media
+  set_fact:
+    virtual_object_source_installer: "iso/Win10_1703_English_x64.iso"
+  when: (virtual_object_type == "vm") and (virtual_object_os == "90")
+
+
+
+
+#################
+## Wrapping up ##
+#################
+- name: Improve default response to hostname
+  set_fact:
+    virtual_object_hostname: '{{virtual_object_os_friendly_name_no_space}}'
+  when: virtual_object_hostname == 'aProv'
+
+
+#- debug: msg="{{virtual_object_network_address_end}}"
+
+- name: Cheap fix to an out-by-one error I created
+  set_fact: virtual_object_network_address_end={{ virtual_object_network_address_end | int - 1 }}
+  when: virtual_object_network_address_end | int >= 1
+## {{ item | int + 204 }}
 ...
