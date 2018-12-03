@@ -12,7 +12,7 @@
 
   vars_prompt:
     - name: virtual_object_os
-      prompt: Which OS do you want to provision? Only Ubuntu 18.04 (choice 1) is supported right now.
+      prompt: Which OS do you want to provision?
       default: 1
       private: no
 
@@ -22,8 +22,8 @@
       private: no
 
     - name: virtual_object_hostname
-      prompt: What do you want to name these VMs?
-      default: aProv-Ubuntu
+      prompt: What do you want the hostname to start with?
+      default: aProv
       private: no
 
     - name: virtual_object_disk_size
@@ -52,9 +52,14 @@
       default: password
       private: yes
 
-    - name: virtual_object_network_address_and_mask
-      prompt: What's the IP address and CIDR mask? We should really be using DHCP for this, especially because I don't yet know how to incriment this address when spinning up muliple instances.
-      default: 10.0.0.1/24
+    - name: virtual_object_network_address_base
+      prompt: Give me the first three octets of your desire IP addresses.
+      default: 10.0.0.
+      private: no
+
+    - name: virtual_object_network_address_end
+      prompt: Give me the last octet if your desired IP addresses, from which I'll increment by 1 for as many vm/containers as you specified earlier, assigning one address to each. For example, starting with 205 and then going to 206 and so on.
+      default: 205
       private: no
       ## robots will skip this bit and use DHCP on an isolated testing network/VLAN
 
@@ -69,5 +74,8 @@
 #    - { role: aptupgrade }
     - { role: convert_human_to_proxmox }
     - { role: provisionproxmox }
+    - { role: gather_ssh_keys }
+    - { role: create_new_ansible_hosts_file }
+    - { role: delete_proxmox_objects }
 
 ...
