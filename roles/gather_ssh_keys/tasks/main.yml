@@ -1,0 +1,63 @@
+---
+## gather_ssh_keys
+
+## So apparently Ansible 2.7.1 always fails on the first shell item in a loop?
+## This took me hours of rewriting and googling to find out.
+## The "retries" you'll see dotted around are the 'solution' to this; 
+## just do it a second time and it'll work.
+
+
+- name: Clean up keys from previous runs
+  shell: echo '{{item}}' ; ssh-keygen -f "/home/toor/.ssh/known_hosts" -R '{{item}}'
+  register: removed_sship
+  loop: "{{ip}}"
+  until: removed_sship.stdout != ''
+  retries: 9
+  ignore_errors: no
+
+- name: Which keys were cleaned?
+  set_fact:
+    removed_sship_out: "{{ removed_sship_out | default ([]) | union ([removed_sship.results[(item|int)-1].stdout]) }}"
+    removed_sship_err: "{{ removed_sship_err | default ([]) | union ([removed_sship.results[(item|int)-1].stderr]) }}"
+  with_sequence: start=1 end='{{vmnumber | int}}' stride=1
+  ignore_errors: no
+
+- name: Cleaning results
+  debug: var=removed_sship_out
+- name: Errors with cleaning old keys
+  debug: var=removed_sship_err
+
+
+
+
+- name: Gather keys of recently created {{virtual_object_type}}s
+  shell: "ssh-keyscan -T 10 -t ecdsa {{item}}"
+  loop: "{{ip}}"
+  until: sship.stdout != ''
+  retries: 9
+  register: sship
+
+- name: Store gathered keys for future interactions
+  known_hosts:
+    name: "{{ item.item }}"
+    key: "{{ item.stdout }}"
+    state: present
+    path: ~/.ssh/known_hosts
+  loop: "{{ sship.results }}"
+  loop_control:
+    label: "{{ item.cmd }}"
+
+- name: Which keys were gathered?
+  set_fact:
+    sship_out: "{{ sship_out | default ([]) | union ([sship.results[(item|int)-1].stdout]) }}"
+    sship_err: "{{ sship_err | default ([]) | union ([sship.results[(item|int)-1].stderr]) }}"
+  with_sequence: start=1 end='{{vmnumber | int}}' stride=1
+  ignore_errors: no
+
+- name: Gathering results
+  debug: var=sship_out
+- name: Errors with gathering
+  debug: var=sship_err
+
+
+...
