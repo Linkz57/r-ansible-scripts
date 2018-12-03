@@ -1,0 +1,27 @@
+---
+## create_new_ansible_hosts_file
+
+
+- name: print all vmids
+  debug: msg="{{vmids}}"
+
+- name: print all hostnames
+  debug: msg="{{created_hostnames}}"
+
+- name: print all IPs
+  debug: msg="{{ip}}"
+
+
+- name: Add to curent Ansible hosts file
+  with_sequence: start=1 end='{{vmnumber | int}}' stride=1
+  add_host:
+    name: "{{created_hostnames}}"
+    groups:
+      - provisionproxmox
+    ansible_host: "{{ip}}"
+    ansible_port: 22
+
+
+
+
+...
