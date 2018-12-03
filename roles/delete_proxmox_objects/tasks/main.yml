@@ -1,0 +1,49 @@
+---
+## delete_proxmox_objects
+
+
+
+#- pause:
+
+
+## stop recently created virtual objects
+- name: Stopping {{vmnumber}} recently created {{virtual_object_os_friendly_name}} {{virtual_object_type}}s on {{proxmox_node}}
+  loop: '{{vmids}}'
+  proxmox:
+    node: '{{proxmox_node}}'
+    api_user: '{{proxmox_username}}@pam'
+    api_password: '{{proxmox_api_pass}}'
+    api_host: '{{proxmox_api_host}}'
+    validate_certs: '{{legit_certs}}'
+#    hostname: '{{virtual_object_hostname}}-{{item}}-{{time_at_run}}'
+#    hostname: '{{created_hostnames}}'
+    vmid: '{{ item }}'
+    state: stopped
+    ## options are present, started, absent, stopped, restarted. Half of these require the HOSTNAME already exist.
+    timeout: 30
+    ## before giving up on this container and maybe failing or maybe going to the next container.
+  when: "'container' in virtual_object_type"
+  ignore_errors: no
+
+
+## delete recently created virtual objects
+- name: Deleting {{vmnumber}} recently created {{virtual_object_os_friendly_name}} {{virtual_object_type}}s on {{proxmox_node}}
+  loop: '{{vmids}}'
+  proxmox:
+    node: '{{proxmox_node}}'
+    api_user: '{{proxmox_username}}@pam'
+    api_password: '{{proxmox_api_pass}}'
+    api_host: '{{proxmox_api_host}}'
+    validate_certs: '{{legit_certs}}'
+#    hostname: '{{virtual_object_hostname}}-{{item}}-{{time_at_run}}'
+#    hostname: '{{created_hostnames}}'
+#    vmid: '{{ item | int + 99 | int }}'
+    vmid: '{{ item }}'
+    state: absent
+    ## options are present, started, absent, stopped, restarted. Half of these require the HOSTNAME already exist.
+    timeout: 30
+    ## before giving up on this container and maybe failing or maybe going to the next container.
+  when: "'container' in virtual_object_type"
+  ignore_errors: no
+
+...
