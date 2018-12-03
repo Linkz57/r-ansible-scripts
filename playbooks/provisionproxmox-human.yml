@@ -1,5 +1,5 @@
 ---
-# file: provisionproxmox.yml
+# file: provisionproxmox-human.yml
 
 - hosts: me
 
@@ -17,14 +17,14 @@
           - "                      #                                               "
           - "       I   h a v e   s o m e   q u e s t i o n s   f o r   y o u      "
 
-    # - pause:
-    #     seconds: 5
+    - pause:
+        seconds: 5
 
     - name: Which OS do you want to provision? Here's your vinilla options.
       debug:
         msg:
-          - "press 01 for Ubuntu 18.04 - Bionic"
-          - "press 02 for Ubuntu 16.04 - Xenial"
+          - "press 1 for Ubuntu 18.04 - Bionic"
+          - "press 2 for Ubuntu 16.04 - Xenial"
           - ""
           - "press 10 for Debian 9 - Stretch"
           - ""
@@ -33,14 +33,16 @@
           - "press 30 for OpenSUSE 15 - Leap"
           - "press 31 for OpenSUSE 15 - Tumbleweed"
           - ""
+          - "~~ All following options aren't yet implimented ~~"
+          - ""
           - "press 40 for Mint 19 - Tara"
           - ""
           - "press 80 for Windows 2016 - 1809"
           - ""
           - "press 90 for Windows 10 - 1809"
 
-     - pause:
-         seconds: 10
+    - pause:
+        seconds: 10
 
     - name: Which OS do you want to provision? Here's your options of OSs pre-configured to run certain services
       debug:
@@ -64,8 +66,8 @@
           - ""
           - "   A n s w e r   n o w :   "
 
-     - pause:
-         seconds: 1
+    - pause:
+        seconds: 1
 
 
 - import_playbook: provisionproxmox-human_questions.yml
