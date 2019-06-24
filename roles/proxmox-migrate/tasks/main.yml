@@ -1,0 +1,124 @@
+---
+## proxmox-migrate.yml
+## version 0.9
+## The goal is to migrate all VMs/containers before a reboot
+
+
+- name: Check cluster health
+  become: true
+  shell: 'pvecm status | grep Quorate\:'
+  ignore_errors: no
+  register: quorate
+
+- debug: msg="Cluster healthy? Survey says {{quorate.stdout}}"
+
+
+- name: Find other cluster nodes
+  become: true
+  shell: pvecm nodes | tail -n+5 | awk '{print $3}'
+  ignore_errors: no
+  register: nodes
+
+- debug: msg="{{nodes.stdout}}"
+
+
+- name: Which nodes are fresh and functional?
+  become: true
+  ignore_errors: no
+  slurp:
+    src: /etc/pve/nodes/moxbox/lrm_status
+  register: a_node
+
+- debug:
+    msg: "{{ a_node['content'] | b64decode }}"
+#      a_node: "{{ lookup('file','/etc/pve/nodes/proxmox512024/lrm_status') | from_json }}"
+
+
+
+- name: print JSON info from a node
+  debug: 
+    msg: "{{ a_node['content'] | b64decode | from_json }}"
+
+
+## pvesh get /nodes --noborder 1 --noheader 1
+## https://pve.proxmox.com/pve-docs/api-viewer/index.html
+
+# if /usr/bin/pvesh get /nodes --output-format text --noborder 1 --noheader 1 |
+# /bin/grep -v $(/bin/hostname) |
+# /usr/bin/cut -d' ' -f2 |
+# /bin/grep online > /dev/null
+# then
+
+
+
+# 	## First shut down all Containers and VMs, because the fastest migrations happen offline.
+# 	/usr/bin/pvesh --nooutput create /nodes/localhost/stopall
+
+
+
+# 	for lxc in $(/usr/bin/pvesh get /nodes/localhost/lxc --output-format json-pretty | ## Find all LXC containers using the Proxmox API,
+# 	/bin/grep '\"vmid\"' | ## then remove everything except the line containing "vmid" with quotes,
+# 	/usr/bin/cut -d':' -f2 | ## remove the JSON key name whatever,
+# 	/usr/bin/cut -d'"' -f2) ## and finally then cut out the quote marks, leaving only a list of VMID numbers
+# 	do
+# 		## Now that we have the list of all LXC containers, migrate them off one-at-a-time to the first node you can find that isn't you.
+# 		/usr/bin/pvesh --nooutput create /nodes/localhost/lxc/$lxc/migrate --restart --target $(/usr/bin/pvesh get /nodes --noborder 1 --noheader 1 | ## Start a migration, and get a list of every node you could migrate your LXC containers to.
+# 		/bin/grep -v $(/bin/hostname) | ## Remove your own name from the list, because migrating to yourself is useless.
+# 		/bin/grep online | ## Filter the list of nodes down to just the folk online at the moment, thus able to be migrated to
+# 		/usr/bin/cut -d' ' -f1 | ## Remove all the metadata like number of cores each node has, and what its favorite color is. An offline migration doesn't need a lot of resources, just anything with a pulse.
+# 		/usr/bin/head -n1) ## Just choose the top of the list. A random spray re-rolled for each migration might be better for a lot of reasons, but it's also harder to clean up afterwards.
+# 	done
+
+
+
+# 	## Find all VMs using the Proxmox API, then cut out everything except the actual VMID. Same as above.
+# 	for qemu in $(/usr/bin/pvesh get /nodes/localhost/qemu --output-format json-pretty |
+# 	/bin/grep '\"vmid\"' |
+# 	/usr/bin/cut -d':' -f2 |
+# 	/usr/bin/cut -d'"' -f2)
+# 	do
+# 		## and again, migrate them off one-at-a-time to the first node that isn't you. Hooray for subshells.
+# 		/usr/bin/pvesh --nooutput create /nodes/localhost/qemu/$qemu/migrate --online --target $(/usr/bin/pvesh get /nodes --noborder 1 --noheader 1 |
+# 		/bin/grep -v $(/bin/hostname) |
+# 		/bin/grep online |
+# 		/usr/bin/cut -d' ' -f1 |
+# 		/usr/bin/head -n1)
+# 	done
+
+# fi
+
+
+## no need to check for present vms, this just got em all
+
+- name: Check for present VMs
+  become: true
+  shell: qm list
+  ignore_errors: no
+  register: vms_present
+  changed_when: 
+    - vms_present.stdout != ""
+#    - softwarecheck.stdout != "\r\n"
+#  when: "'Ubuntu' in ansible_distribution"
+
+- debug: msg="VMs present {{vms_present.stdout}}"
+  when: 'vms_present.stdout != ""'
+
+  
+
+- name: Check for present containers
+  become: true
+  shell: pct list
+  ignore_errors: no
+  register: containers_present
+  changed_when: 
+    - containers_present.stdout != ""
+#  when: "'Ubuntu' in ansible_distribution"
+
+- debug: msg="Containers present {{containers_present.stdout}}"
+  when: 'containers_present.stdout != ""'
+
+
+
+
+
+...
