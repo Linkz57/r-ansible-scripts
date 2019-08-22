@@ -8,6 +8,7 @@
   ignore_errors: no ## your whole point is to error out.
 
 
+## pool_to_shutdown is set manually at run-time. This variable is not defined anywhere else.
 - name: Find VOs to shutdown
   become: true
   shell: /usr/bin/pvesh get /pools/{{pool_to_shutdown}} --output-format json-pretty | /bin/grep '"vmid"' | /usr/bin/awk -F'(" {{ ":" }} )' '{print $2}'
