@@ -17,7 +17,7 @@ The following directories:
     - Tested on Ubuntu Server 16.04.03 and 17.04.
     - Tested with Nagios 4.3.2.
 
-- roles/provisionxenservervm -- Create many machines from nothing, onto which you can automatically install Nagios or something else in the future
+- roles/provisionxenservervm -- Create many machines from nothing, onto which you can automatically install Nagios or something else in the future. This is not fully working, and never will be since Jelec has disolved its XenServer pools.
 
     - Tested on XenServer 7.1.0
     
