@@ -1,0 +1,8 @@
+---
+proxmox_api_pass: !vault |
+          $ANSIBLE_VAULT;1.1;uncrackableEncryption
+          1234
+          5678
+          9
+proxmox_api_host: '{{ ansible_default_ipv4.address }}'  ## This variable is aet automatically by Ansible, all the time. It refers to the current host Ansible is working with.
+...
