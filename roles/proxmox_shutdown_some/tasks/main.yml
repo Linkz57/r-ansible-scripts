@@ -1,0 +1,52 @@
+---
+# file: proxmox_shutdown_some/tasks/main.yml
+
+
+- name: Is the cluster healthy? If not, then error out of all this.
+  become: true
+  shell: /usr/bin/pvesh get /cluster/status --output-format json-pretty | grep 'quorate" {{ ":" }} 1'
+  ignore_errors: no ## your whole point is to error out.
+
+
+- name: Find VOs to shutdown
+  become: true
+  shell: /usr/bin/pvesh get /pools/{{pool_to_shutdown}} --output-format json-pretty | /bin/grep '"vmid"' | /usr/bin/awk -F'(" {{ ":" }} )' '{print $2}'
+  register: vos
+
+# - name: What VMIDs have we collected?
+#   debug:
+#     msg:
+#       - '{{vos.stdout_lines }}'
+
+
+
+- name: Shut down some unneeded Containers
+  loop: '{{vos.stdout_lines}}'
+  proxmox:
+    api_host: '{{ proxmox_api_host }}'
+    api_user: 'root@pam'
+#    force: no
+    vmid: '{{item}}'
+    api_password: '{{proxmox_api_pass}}'
+#    pool: '{{ pool_to_shutdown }}' # Apparenly only useful for creation, not control
+    validate_certs: no
+    state: stopped # present;started;absent;stopped;restarted.
+    timeout: 130 # Presumably seconds
+  ignore_errors: yes  ## Any VMs listed here will error out.
+
+
+
+- name: Shut down some unneeded VMs
+  loop: '{{vos.stdout_lines}}'
+  proxmox_kvm:
+    api_host: '{{ proxmox_api_host }}'
+    api_user: 'root@pam'
+    vmid: '{{item}}'
+    api_password: '{{proxmox_api_pass}}'
+    validate_certs: no
+    state: stopped # present;started;absent;stopped;restarted.
+    timeout: 130
+  ignore_errors: yes  ## Any containers listed here will cause an error.
+
+
+...
