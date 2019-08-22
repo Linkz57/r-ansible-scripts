@@ -20,10 +20,25 @@ The following directories:
 - roles/provisionxenservervm -- Create many machines from nothing, onto which you can automatically install Nagios or something else in the future
 
     - Tested on XenServer 7.1.0
+    
+- roles/provisionproxmox -- Create many machines from nothing, onto which you can automatically install Nagios or more importantly automatically test backups by spinning them up on isolated VLANs and checking them with Nagios, reporting the results and automaticvally deleting both.
+
+    - Tested on Proxmox 5.2-10 and 5.4-5
 
 - playbooks/proxmox-upgrade -- Rolling update on one or more Proxmox Clusters
 
     - Tested on PVE 5.4-13
+    
+    
+provisionproxmox
+----------------
+This is going to be super dope when it's done. What's the use of backups? To restore them in an emergency. How do we know if a backup can be restored? Well, we can restore them and then test if they do what they should. How do we test to see if a machine is doing what it should? Nagios is handy with that.
+
+The plan is: we get a physically seperate Proxmox box/cluster and spin up a bunch of backup onto it, automatically. We'll also spin up a Nagios container that tests the restored backup for a bit, and then both Nagios and the backup is deleted, and another backup is restored into a VM and we do it all over again, over and over for each backup. The whole time this will be a physically seperate network because we don't want any backup machines running on the same network as their origionals, causing collisions. Some humans come in Monday and check the status of the backup test.
+
+How will this look? Nagios has this "Host Group Grid" view that seems like a nice way to see all test results in rows and columns, color-coded. Maybe instead of building and destroying Nagios 60 times every weekend, we keep the same instance running all week, and then tell it 60 times to "Enable active checks of this service" while that backup has spun up, wait 10 minutes, then tell it to "Disable active checks of this service" and then destroy the restored machine. Then on Monday morning we can go to the seperate network, or be emailed a screenshot, and see what's red, what's green, and what service hasn't been checked in more than a week (nagios can sort by 'date last checked').
+
+How will this cluster be powered?
 
 proxmox-upgrade
 ---------------
