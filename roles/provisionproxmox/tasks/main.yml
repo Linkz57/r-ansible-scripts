@@ -20,8 +20,8 @@
     password: '{{virtual_object_pass}}'
     vmid:
     ## if vmid is not explicitly empty, Ansible will not create new objects and instead skip over existing ones.
-#    vmid: '{{ item | int + 99 | int }}'
-## uncomment vmid immediatly above to delete x number of VMs, and comment out hostname below, and comment out null vmid above, and change STATE to absent.
+    #vmid: '{{ item | int + 99 | int }}'
+    ## uncomment vmid immediatly above to delete x number of VMs, and comment out hostname below, and comment out null vmid above, and change STATE to absent.
     hostname: '{{virtual_object_hostname}}-{{item}}-{{time_at_run}}'
     netif: '{"net0":"name=eth0,gw={{virtual_object_network_gateway}},ip={{virtual_object_network_address_base}}{{ item | int + virtual_object_network_address_end | int }}/{{virtual_object_network_mask}},bridge=vmbr0"}'
     ostemplate: '{{virtual_object_source_nas}}:{{virtual_object_source_installer}}'
@@ -55,21 +55,33 @@
 
 
 
+
+#    m               #        
+#  mm#mm   mmm    mmm#   mmm  
+#    #    #" "#  #" "#  #" "# 
+#    #    #   #  #   #  #   # 
+#    "mm  "#m#"  "#m##  "#m#" 
 ## Here we create VMs... later. Still haven't written this yet
-# - name: Create {{vmnumber}} new {{virtual_object_os_friendly_name}} {{virtual_object_type}}s on {{proxmox_node}} whoes hostnames start with {{virtual_object_hostname}}
-#   proxmox_kvm:
-#     node: '{{proxmox_node}}'
-#     api_user: '{{proxmox_username}}@pam'
-#     api_password: '{{proxmox_api_pass}}'
-#     api_host: '{{proxmox_api_host}}'
-#     password: '{{ virtual_object_pass }}'
-#     hostname: '{{virtual_object_hostname}}-{{item}}-{{time_at_run}}'
-#     ostemplate: '{{virtual_object_source_nas}}:{{virtual_object_source_installer}}'
-#     net: '{"net0":"virtio,bridge=vmbr1,rate=200"}'
-#     virtio: '{"virtio0":"VMs_LVM:'virtual_object_disk_size',format=qcow2"}'
-#     cores: 1
-#     vcpus: 1
-#     when: "'vm' in virtual_object_type"
+## https://github.com/Linkz57/r-shell-scripts/blob/master/automation/vmTemplateFirstRun.sh
+## That script I wrote for XenServer VM templates will probably work fine for Proxmox VM templates.
+## After all, the VM doesn't know or care what its hypervisor is.
+## I need to pull out the script's questions to humans and replace it with the
+## hostname, password, and IP defined in provisionproxmox-human_questions.yml
+- name: Create {{vmnumber}} new {{virtual_object_os_friendly_name}} {{virtual_object_type}}s on {{proxmox_node}} whoes hostnames start with {{virtual_object_hostname}}
+  register: create
+  with_sequence: start=1 end='{{vmnumber | int}}' stride=1
+  proxmox_kvm:
+    node: '{{proxmox_node}}'
+    api_user: '{{proxmox_username}}@pam'
+    api_password: '{{proxmox_api_pass}}'
+    api_host: '{{proxmox_api_host}}'
+    clone: '{{virtual_object_source_nas}}:{{virtual_object_source_installer}}'
+    name: '{{virtual_object_hostname}}'
+    storage: local-zfs
+    #format: qcow2
+    full: '{{full_clone}}'
+    timeout: 600
+    when: "'vm' in virtual_object_type"
 
 
 # - name: print all info we have about the creation process, for human use.
@@ -104,6 +116,10 @@
   debug: msg="{{created_hostnames}}"
 
 
+# - name: what type is created_hostnames
+#   debug: msg="{{ created_hostnames | type_debug }}"
+
+# - pause:
 
 ## Here we collect vmid numbers from the created machines above, to be cleaned up later
 - name: Get VMID numbers from each virtual object that was just created
