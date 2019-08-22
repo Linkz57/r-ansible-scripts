@@ -1,0 +1,16 @@
+---
+- name: Install Pip2 because we're living in the past :(  .
+  become: yes
+  apt:
+    name: python-pip
+    state: latest # absent;build-dep;latest;present.
+
+
+- name: Install Python modules required for Promox
+  pip:
+    name: 
+      - proxmoxer
+      - requests
+    editable: no
+    state: latest # absent;forcereinstall;latest;present.
+...
