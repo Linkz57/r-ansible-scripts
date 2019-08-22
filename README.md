@@ -38,7 +38,14 @@ The plan is: we get a physically seperate Proxmox box/cluster and spin up a bunc
 
 How will this look? Nagios has this "Host Group Grid" view that seems like a nice way to see all test results in rows and columns, color-coded. Maybe instead of building and destroying Nagios 60 times every weekend, we keep the same instance running all week, and then tell it 60 times to "Enable active checks of this service" while that backup has spun up, wait 10 minutes, then tell it to "Disable active checks of this service" and then destroy the restored machine. Then on Monday morning we can go to the seperate network, or be emailed a screenshot, and see what's red, what's green, and what service hasn't been checked in more than a week (nagios can sort by 'date last checked').
 
-How will this cluster be powered?
+How will this cluster be powered? We have a lot of fairly powerful workstations that are (with some exception) used for 8 hours every weekday and ignored at all other times, right? Here's some half-formed thoughts on how we can gain a large ammount of compute power for little cost:
+- employees shut down their workstations when they leave for the night
+- at 6pm send a WOL packet to all workstations, which are set to PXE boot either always or just on WOL
+- workstations still running are either being used by a human or doing what a human told them to do, and ignore the WOL and certainly don't PXE boot
+- at any time besides 6pm, PXE booting does nothing. at 6pm it boots to a unique Proxmox live environment, and checks our backups
+- or maybe instead of proxmox just a regular ubuntu that runs a virus scan or calculates shasums of files unfortunate enough to not be on a ZFS volume.
+- When they're done, they shut down. When 5am rolls around their PXE images are all set to shut down forcefully-mid job.
+- Eventually we'll see a pattern of reports saying 'check failed because 5am happened' about one or two of our biggest backups, and then we can either relegate those tests to just the weekend, or invest in dedicated hardware for these one or two backups if they're important enough. Maybe that hardware will be in the form of a very fast workstation for a lucky employee. The majority of our servers run Linux or Unix, and as such have very small backups that can be tested much quicker.
 
 proxmox-upgrade
 ---------------
