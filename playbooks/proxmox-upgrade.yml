@@ -1,0 +1,32 @@
+---
+# file: proxmox-upgrade.yml
+## this first bit runs on every host.
+
+
+- hosts: '{{ ansible_group_to_update }}' ## pass this variable manually at runtime. This variable is not defined otherwise.
+  gather_facts: False
+  become_method: su
+  serial: 1
+
+
+  roles:
+    - role: ansibleprep
+    - role: are_updates_necessary
+
+
+## This second bit only runs on machines that need updating
+- hosts: currentlyWantingAnUpdate
+  become_method: su
+  serial: 1
+
+## These first two roles only runs on the first host in this group.
+  roles:
+    - role: proxmox_ansibleprep
+      when: inventory_hostname == ansible_play_hosts_all[0]
+    - role: proxmox_shutdown_some
+      when: inventory_hostname == ansible_play_hosts_all[0]
+    - role: proxmox_update
+    #- role: wait_for_reboot
+
+
+...
