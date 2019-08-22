@@ -1,0 +1,66 @@
+---
+# file: proxmox_update/tasks/main.yml
+
+## I just want to copy a bash script to the local proxmox node, and run it
+
+# - name: I want to see live script output ## doesn't seem to work
+#   raw: export PYTHONUNBUFFERED=1
+
+
+- name: Copy update script to Proxmox Box
+  become: yes
+  copy:
+    dest: /root/scripts/
+    src: on_box_migrate_and_update.sh
+    force: yes # replace old script
+    remote_src: no
+    checksum: 00b1d26e34ec85d724801ad7ea34af9accf8fae5 # SHA1
+    decrypt: no
+    group: root
+    unsafe_writes: no
+    mode: 0700
+    owner: root
+    follow: no
+    backup: no
+    local_follow: no
+
+
+
+# - name: Run the testing, migration, and updates in Bash
+#   register: actualUpdate
+#   become: yes
+#   shell: "/root/scripts/on_box_migrate_and_update.sh"
+#   args:
+#     warn: yes
+#     executable: /bin/bash
+#     chdir: /root/scripts/
+
+
+## This "ssh-ing into yourself" thing is gross, but it was the only thing I could get to work.
+## I hope I'm invoking the HostKeyAlias option in a way that works and bypasses "fist time connecting" prompt.
+## You know, I could probably instal tmux and run this inside that, instead of using ssh which is already instaled...
+- name: Run the testing, migration, and updates in Bash
+  become: yes
+  raw: /usr/bin/ssh -t localhost -o HostKeyAlias='{{origional_name}}' "/bin/bash -c /root/scripts/on_box_migrate_and_update.sh" # > /root/scripts/on_box_migrate_and_update.sh.log"
+#  failed_when: diff_cmd.rc > 101 or diff_cmd.rc < 101 ## don't fail when you lose connection to the host; that means a reboot happened and everything is going according to plan.
+
+
+- name: reboot without using Ansible
+  become: yes
+  raw: shutdown -r +1
+
+
+- name: wait 5 minutes or longer for the reboot to finish
+  wait_for_connection:
+      delay: 300 # don't start checking for this many seconds
+      sleep: 5
+      connect_timeout: 20 # max seconds for each try
+      timeout: 600 # total seconds
+
+
+# - name: What just happened?
+#   ignore_errors: yes ## usually this machine will have shut down at this point, so we'll be unable to have it print this.
+#   debug:
+#     msg:
+#       - '{{ actualUpdate.stdout }}'
+...
