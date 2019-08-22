@@ -1,0 +1,22 @@
+---
+- name: Check for updates
+  become: true
+  shell: apt update | tail -n1
+  register: mahApt
+
+## oddly enough, this add_host thing is ephemeral, which is exactly what I want. Run this play twice, and the second time will have an empty currentlyWantingAnUpdate
+- name: If you need an update, stick your name in a new hosts file
+  when: "' can be upgraded. Run ' in mahApt.stdout"
+  add_host:
+    name: '{{ ansible_hostname }}-wantsAnUpdate' # The hostname/ip of the host to add to the inventory, can include a colon and a port number.
+    groups: currentlyWantingAnUpdate # comma separated.
+    ansible_host: '{{ ansible_default_ipv4.address }}'
+    origional_name: '{{ ansible_hostname }}'
+
+# - name: who wants an update?
+#   when: "'packages can be upgraded. Run ' in mahApt.stdout"
+#   debug:
+#     msg:
+#       - '{{ ansible_hostname }} wants an update'
+#       - '{{ mahApt.stdout }}'
+...
