@@ -21,7 +21,7 @@
 - name: Ubuntu -- checking and maybe installing Python for Ansible
   become: true
   ignore_errors: yes
-  raw: sudo bash -c "test -e /usr/bin/python || (apt -qqy update && apt install -qy python-minimal)"
+  raw: bash -c "test -e /usr/bin/python || (apt -qqy update && apt install -qy python-minimal)"
   register: output
   changed_when: 
     - output.stdout != ""
