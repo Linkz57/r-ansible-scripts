@@ -14,7 +14,7 @@
     src: on_box_migrate_and_update.sh
     force: yes # replace old script
     remote_src: no
-    checksum: 00b1d26e34ec85d724801ad7ea34af9accf8fae5 # SHA1
+    checksum: d33d0233b111b4d9433ea83f1d2c3f03919b517c # SHA1
     decrypt: no
     group: root
     unsafe_writes: no
@@ -47,7 +47,7 @@
 
 - name: reboot without using Ansible
   become: yes
-  raw: shutdown -r +1
+  raw: PATH=/sbin:/usr/sbin:$PATH ; shutdown -r +1
 
 
 - name: wait 5 minutes or longer for the reboot to finish
