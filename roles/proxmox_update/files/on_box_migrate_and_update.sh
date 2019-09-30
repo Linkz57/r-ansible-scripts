@@ -1,6 +1,6 @@
 #!/bin/bash
 ## on_box_migrate_and_update.sh
-## version 2.0
+## version 3.15
 ## The goal here is to perform a rolling update and reboot of every node.
 ##
 ## To do that, this script first shuts down a "pool" of VMs and containers that a human previous said was ok to shut down whenever.
@@ -27,6 +27,10 @@ ramFillLine="5/10"
 ## If a node is using more than 60% of all its CPU cores, then don't migrate to it. Type this as a percentage number without the % symbol.
 cpuFillLine="60"
 
+## If you're using local storage for a VM, I'll check the receiving node's local storage space. What threshold of available space do you want to always preserve? I'll assume all the numbers are literal, like they're not thin-provisioned--that will give you room to grow and be easier to math out.
+## Type this as a percentage, but without the % symbol.
+diskMarginPercentage="30"
+
 
 
 
@@ -42,8 +46,20 @@ safeToReboot=false
 
 
 
-
-
+          #                  ""#          
+  #mm   mmm    mmmmm  mmmm     #     mmm  
+ #   "    #    # # #  #" "#    #    #"  # 
+  #""m    #    # # #  #   #    #    #"""" 
+ #mmm"  mm#mm  # # #  ##m#"    "mm  "#mm" 
+                      #                   
+                      #
+          #                           m      "                        
+ #mmmm  mmm     mmmm   m mm   mmm   mm#mm  mmm     mmm   m mm    mmm  
+ # # #    #    #" "#   #"  " "   #    #      #    #" "#  #"  #  #   " 
+ # # #    #    #   #   #     m"""#    #      #    #   #  #   #   """m 
+ # # #  mm#mm  "#m"#   #     "mm"#    "mm  mm#mm  "#m#"  #   #  "mmm" 
+                #  #                                                  
+                 #"                                                   
 
 ## migrate offline Containers if the cluster is healthy
 printf "\n\n\n"
@@ -109,6 +125,12 @@ fi
 
 
 
+                        #             "                               
+  #mm    mmm   m mm   mm#mm   mmm   mmm    m mm    mmm    m mm   mmm  
+ #"  "  #" "#  #"  #    #    "   #    #    #"  #  #"  #   #"  " #   " 
+ #      #   #  #   #    #    m"""#    #    #   #  #""""   #      """m 
+  ##m"  "#m#"  #   #    "mm  "mm"#  mm#mm  #   #  "#mm"   #     "mmm" 
+
 iHaveContainers=true
 
 ## migrate running Containers if the cluster is healthy
@@ -124,7 +146,7 @@ then
 		## Wait a bit for previous migrations to boot up and consume resources, before evaluating further migration targets
 		sleep 20
 
-		## check its resource requirements
+		## check its resource requirements, if it's running
 		voMaxRam=$(pvesh get "/nodes/localhost/lxc/$lxcRemaining/config" --output-format json-pretty |
 		grep '\"memory\" \: ' |
 		awk -F'[(: )|,]' '{print $7}')
@@ -213,17 +235,212 @@ then
 #			usedRamReal=$(echo "$usedRamReal" | cut -d'.' -f1)
 #			voMaxRam=$(echo "$voMaxRam" | cut -d'.' -f1)
 
+			
+			ram=false
+			cpu=false
+			disk=false
 			## Bash follows the order of operations, even though left-to-right would also work in this case. voMaxRam is always in MiB.
-			if [[ $( echo "$maxRamReal * $ramFillLine - $usedRamReal" | bc | cut -d'.' -f1) -gt $( echo "$voMaxRam * 1048576" | bc | cut -d'.' -f1) ]] &&
-			[[ $( echo "${resourceArray[0]}" | cut -d'%' -f1 | cut -d'.' -f1 ) -lt 60 ]]; then
+			if pct list | grep -E "$lxcRemaining.*stopped" || ## if the container is either stopped or doesn't take too much RAM
+				## a potential migration destination has enough RAM for the thing you want to migrate, and would still stay under "ramFillLine" set at the beginning of this script
+				[[ $( echo "$maxRamReal * $ramFillLine - $usedRamReal" |
+				bc |
+				cut -d'.' -f1) -gt $( echo "$voMaxRam * 1048576" |
+				bc |
+				cut -d'.' -f1) ]]
+			then
+				ram=true
+			fi
+
+			if pct list | grep -E "$lxcRemaining.*stopped" ||
+				## and isn't curretly consuming more than "cpuFillLine" percent of CPU
+				[[ $( echo "${resourceArray[0]}" |
+				cut -d'%' -f1 |
+				cut -d'.' -f1 ) -lt $cpuFillLine ]]
+			then
+				cpu=true
+			fi
+
+
+				## and, if it's locally stored, the disk isn't more than the recieving node can handle
+				if /usr/bin/pvesh get "/nodes/localhost/lxc/$lxcRemaining/config" --output-format json-pretty | ## Are you using local disks?
+				/bin/grep '\"rootfs\"' |
+				/usr/bin/cut -d':' -f2 | ## remove the JSON name field
+				/bin/grep local ## is it a locally stored filesystem?
+				then
+					## it's locally stored. Better make sure the destination node has enough space.
+
+					## but first: what's the container's specs?
+
+					## Number of things in array	0		1		2		2.5		3		4		5		6		7		8		9		10
+					## Name of those things			status	vmid	cpus	lock	maxdisk	dskUnit	maxmem	memUnit	maxswap	swpunit	name	uptime
+					voArray=($(pvesh get /nodes/localhost/lxc  --noborder 1 --noheader 1 | grep "$lxcRemaining"))
+
+
+					## multiply max disk size each by its unit. Proxmox seems to ship with BC.
+					case ${voArray[4]} in
+
+						PiB|pib )
+							requiredDiskReal=$(echo "${voArray[3]} * 1125899906842624" | bc)
+						;;
+
+						TiB|tib )
+							requiredDiskReal=$(echo "${voArray[3]} * 1099511627776" | bc)
+						;;
+
+						GiB|gib )
+							requiredDiskReal=$(echo "${voArray[3]} * 1073741824" | bc)
+						;;
+
+						MiB|mib )
+							requiredDiskReal=$(echo "${voArray[3]} * 1048576" | bc)
+						;;
+
+						KiB|kib )
+							requiredDiskReal=$(echo "${voArray[3]} * 1024" | bc)
+						;;
+
+					esac
+
+					
+					if ssh -o ConnectTimeout=30 -o BatchMode=yes -o HostKeyAlias=$resourcez $( grep -A 3 $resourcez /etc/pve/corosync.conf | grep ring0_addr | awk -F '(: )' '{print $2}' ) "grep -i zfs /proc/cmdline" ## did the potential desination node boot from ZFS today or any other Filesystem? TODO: check also for BTRFS and other weird filesystems
+					## It was many hours after writing the above line that I discovered df -T was a thing :( 
+					then
+                        #mmmmm mmmmmm  mmmm 
+                            #" #      #"   "
+                          ##   #mmmmm "#mmm 
+                         #"    #          "#
+                        ##mmmm #      "mmm#"
+                       
+						## Number of things in array	0		1		2		3		4		5		6		7		8		9
+						## Name of those things			name	size	used	free	expandz	frag	capacty	dedup	health	altroot
+						diskArray=($(ssh -o ConnectTimeout=30 -o BatchMode=yes -o HostKeyAlias=$resourcez $( grep -A 3 $resourcez /etc/pve/corosync.conf | grep ring0_addr | awk -F '(: )' '{print $2}' ) "zpool list | grep $(grep ZFS= /proc/cmdline | cut -d' ' -f2 | sed 's/root=ZFS=//' | cut -d'/' -f1)"))
+
+						## Remove all numbers (digits) and periods from ZFS size, so we are left with just a letter
+						## find used size
+						case $(${arra[2]} | sed 's/[[:digit:]].//g') in 
+
+							P|p )
+								usedDiskReal=$(echo "$(echo "${arra[2]}" | sed 's/[[:alpha:]]//') * 1125899906842624" | bc)
+							;;
+
+							T|t )
+								usedDiskReal=$(echo "$(echo "${arra[2]}" | sed 's/[[:alpha:]]//') * 1099511627776" | bc)
+							;;
+
+							G|g )
+								usedDiskReal=$(echo "$(echo "${arra[2]}" | sed 's/[[:alpha:]]//') * 1073741824" | bc)
+							;;
+
+							M|m )
+								usedDiskReal=$(echo "$(echo "${arra[2]}" | sed 's/[[:alpha:]]//') * 1048576" | bc)
+							;;
+
+							K|k )
+								usedDiskReal=$(echo "$(echo "${arra[2]}" | sed 's/[[:alpha:]]//') * 1024" | bc)
+							;;
+
+						esac
+
+						## find free size
+						case $(${arra[3]} | sed 's/[[:digit:]].//g') in 
+
+							P|p )
+								availableDiskReal=$(echo "$(echo "${arra[3]}" | sed 's/[[:alpha:]]//') * 1125899906842624" | bc)
+							;;
+
+							T|t )
+								availableDiskReal=$(echo "$(echo "${arra[3]}" | sed 's/[[:alpha:]]//') * 1099511627776" | bc)
+							;;
+
+							G|g )
+								availableDiskReal=$(echo "$(echo "${arra[3]}" | sed 's/[[:alpha:]]//') * 1073741824" | bc)
+							;;
+
+							M|m )
+								availableDiskReal=$(echo "$(echo "${arra[3]}" | sed 's/[[:alpha:]]//') * 1048576" | bc)
+							;;
+
+							K|k )
+								availableDiskReal=$(echo "$(echo "${arra[3]}" | sed 's/[[:alpha:]]//') * 1024" | bc)
+							;;
+
+						esac
+
+
+						## find total size
+						case $(${arra[1]} | sed 's/[[:digit:]].//g') in 
+
+							P|p )
+								totalDiskReal=$(echo "$(echo "${arra[1]}" | sed 's/[[:alpha:]]//') * 1125899906842624" | bc)
+							;;
+
+							T|t )
+								totalDiskReal=$(echo "$(echo "${arra[1]}" | sed 's/[[:alpha:]]//') * 1099511627776" | bc)
+							;;
+
+							G|g )
+								totalDiskReal=$(echo "$(echo "${arra[1]}" | sed 's/[[:alpha:]]//') * 1073741824" | bc)
+							;;
+
+							M|m )
+								totalDiskReal=$(echo "$(echo "${arra[1]}" | sed 's/[[:alpha:]]//') * 1048576" | bc)
+							;;
+
+							K|k )
+								totalDiskReal=$(echo "$(echo "${arra[1]}" | sed 's/[[:alpha:]]//') * 1024" | bc)
+							;;
+
+						esac
+
+
+						## Now the moment we've all been waiting for: more math. Is this VO too fat for this potential destination node?
+						[[ $( echo "$availableDiskReal - ($totalDiskReal * $diskMarginPercentage / 100) - $requiredDiskReal" |
+						bc | ## actual math, before truncating down to an integer for Bash.
+						cut -d'.' -f1 ) -gt 1  ]] && disk=true
+					else
+                                  #    #                           mmmmmm  mmmm 
+                          #mm   mm#mm  # mm    mmm    m mm         #      #"   "
+                         #" "#    #    #"  #  #"  #   #"  "        #mmmmm "#mmm 
+                         #   #    #    #   #  #""""   #            #          "#
+                          #m#     "mm  #   #  "#mm"   #            #      "mmm#"
+                        
+						## you're not using ZFS, so I'm assuming it's something simple like EXT or XFS.
+
+						
+						otherFileSystemAvailable=$(ssh -o ConnectTimeout=30 -o BatchMode=yes -o HostKeyAlias=$resourcez $( grep -A 3 $resourcez /etc/pve/corosync.conf | grep ring0_addr | awk -F '(: )' '{print $2}' ) "vgs --noheadings --units b --nosuffix -o lv_size,lv_dmpath --nameprefixes" |
+						grep "LVM2_LV_DM_PATH='/dev/mapper/pve-data'" |
+						cut -d"'" -f2)
+
+						otherFileSystemTotal=$(ssh -o ConnectTimeout=30 -o BatchMode=yes -o HostKeyAlias=$resourcez $( grep -A 3 $resourcez /etc/pve/corosync.conf | grep ring0_addr | awk -F '(: )' '{print $2}' ) "pvdisplay --units b" | grep -A 1 -E 'VG Name.*pve' | tail -n 1 | awk '{print $3}')
+
+						[[ $( echo "$otherFileSystemAvailable - ($otherFileSystemTotal * $diskMarginPercentage / 100) - $requiredDiskReal" |
+						bc | ## actual math, before truncating down to an integer for Bash.
+						cut -d'.' -f1 ) -gt 1  ]] && disk=true
+
+					fi ## has enough local disk space
+				else
+					## not locally stored
+					disk=true
+				fi ## using local disks
+
+
+			if $ram && $cpu && $disk
+
+			then
 				## ok to migrate
+				printf "\n\n\n"
 				/usr/bin/pvesh --nooutput create "/nodes/localhost/lxc/$lxcRemaining/migrate" --restart --target "$resourcez"
 				break
 				## break this loop looking for nodes, and continue the parent loop looking for containers that need migration
 			else
 				## not enough spare resources.
 				echo "$(echo "(($maxRamReal * $ramFillLine) - $usedRamReal) / 1048576" | bc ) MiB of available RAM is apparently not enough on $resourcez to accept LXC $lxcRemaining with its needed $voMaxRam MiB of RAM."
-				echo "Or maybe $resourcez was using more than $cpuFillLine of its CPU? It was at ${resourceArray[0]} when I checked."
+				echo "Or maybe $resourcez was using more than $cpuFillLine% of its CPU? It was at ${resourceArray[0]} when I checked."
+				echo "It could also be that the $( echo "$requiredDiskReal / 1073741824" | bc) GiB disk was too big for the available space of $( echo "$otherFileSystemAvailable / 1073741824" | bc) GiB."
+				echo "now that I think about it:"
+				if $ram ; then echo "The RAM was ok" ; fi
+				if $cpu ; then echo "The CPU was ok" ; fi
+				if $disk ; then echo "The Disk was ok" ; fi
 				printf "Either way, I'm going to look for another node to migrate to.\n\n"
 			fi
 
@@ -236,6 +453,17 @@ then
 	fi
 fi
 
+                   #                                m             "          
+  #mm   m mm    mmm#          mmm    mmm   m mm   mm#mm   mmm   mmm    m mm  
+ #"  #  #"  #  #" "#         #"  "  #" "#  #"  #    #    "   #    #    #"  # 
+ #""""  #   #  #   #         #      #   #  #   #    #    m"""#    #    #   # 
+  #mm"  #   #  "#m##         "#mm"  "#m#"  #   #    "mm  "mm"#  mm#mm  #   #
+
+
+
+
+
+
 
 ## migrating something will wait until the migration is complete and then go onto the next task
 ## migrating something under HA, on the other hand, send a migration request,
@@ -245,10 +473,11 @@ fi
 if $iHaveContainers ; then
 	printf "\n\n\n"
 	echo "Looking for in-progress migrations to or from this node..."
-	sleep 40
+	sleep 30
 	while ps aux |
 	grep -v grep |
-	grep -E "((zfs )(recv)|(send))|(/usr/bin/perl /usr/sbin/pvesm import)"
+	grep -E "((zfs )(recv)|(send))|(/usr/bin/perl /usr/sbin/pvesm import)|(ssh.*HostKeyAlias=.*ExitOnForwardFailure=yes.*-L /run.*migrate.*tunnel)|(ssh.*HostKeyAlias=.*pvesr)|(ssh.*HostKeyAlias=.*pct st)" ||
+	pvesh get /cluster/ha/status/current --noborder --noheader | grep migrate
 	do
 		sleep 5
 		echo "Still migrating stuff"
@@ -259,6 +488,19 @@ fi
 
 ## it only took me 8 tries to write that grep regex. I'm obviously transcending to a greater form of consciousness.
 
+
+
+
+
+
+
+          #                           m                  m    m m    m       
+ #mmmm  mmm     mmmm   m mm   mmm   mm#mm   mmm          "m  m" ##  ##  mmm  
+ # # #    #    #" "#   #"  " "   #    #    #"  #          #  #  # ## # #   " 
+ # # #    #    #   #   #     m"""#    #    #""""          "mm"  # "" #  """m 
+ # # #  mm#mm  "#m"#   #     "mm"#    "mm  "#mm"           ##   #    # "mmm" 
+                #  #                                                         
+                 #"
 
 ## Were all Containers migrated off? If so, start migrating VMs
 printf "\n\n\n"
@@ -291,9 +533,9 @@ else
 
 			## check its resource requirements
 			qemuMaxRam=$(pvesh get "/nodes/localhost/qemu/$qemuRemaining/config" --output-format json-pretty |
-			grep -A 1 '\"memory\"\: ' |
-			tail -n 1 |
-			awk -F'(: )' '{print $2}')
+			grep '\"memory\"' |
+			awk -F'(: )' '{print $2}' |
+			cut -d',' -f1)
 
 			## find all online nodes,
 			for resourcez in $(/usr/bin/pvesh get /nodes --noborder 1 --noheader 1 |
@@ -370,17 +612,206 @@ else
 				esac
 
 
+				ram=false
+				cpu=false
+				disk=false
 				## Bash follows the order of operations, even though left-to-right would also work in this case. qemuMaxRam is always in MiB.
-				if [[ $( echo "$maxRamReal * $ramFillLine - $usedRamReal" | bc | cut -d'.' -f1) -gt $( echo "$qemuMaxRam * 1048576" | bc | cut -d'.' -f1) ]] &&
-				[[ $( echo "${resourceArray[0]}" | cut -d'%' -f1 | cut -d'.' -f1 ) -lt 60 ]]; then
+					if qm list | grep -E "$qemuRemaining.*stopped" || ## if it's either off or small enough
+						## if has enough RAM
+						[[ $( echo "$maxRamReal * $ramFillLine - $usedRamReal" |
+						bc |
+						cut -d'.' -f1) -gt $( echo "$qemuMaxRam * 1048576" |
+						bc |
+						cut -d'.' -f1) ]]
+					then
+						ram=true
+					fi
+
+
+					if qm list | grep -E "$qemuRemaining.*stopped" || ## either off or the destination has enough CPU
+						[[ $( echo "${resourceArray[0]}" |
+						cut -d'%' -f1 |
+						cut -d'.' -f1 ) -lt 60 ]]
+					then
+						cpu=true
+					fi
+
+
+					## and, if local, it has enough disk space
+					if
+						pvesh get "/nodes/localhost/qemu/$qemuRemaining/config" --output-format json-pretty | ## check the configuration of each VM
+						grep -E '^   "((scsi)|(sata)|(virtio)|(ide))[0-9]*. : "local' ## if it has a locally stored filesystem...
+					then
+						## it's locally stored. Better make sure the destination node has enough space.
+
+						## but first: what's the container's specs?
+
+						## # things in array	0		1		2		2.5		3		4		5		6		7		8		8.5		10
+						## Name of things		status	vmid	cpus	lock	maxdisk	dskUnit	maxmem	memUnit	name	pid		qmpstat	uptime
+						voArray=($(pvesh get /nodes/localhost/qemu --noborder 1 --noheader 1 | grep "$qemuRemaining"))
+
+
+						## multiply max disk size each by its unit. Proxmox seems to ship with BC.
+						case ${voArray[4]} in
+
+							PiB|pib )
+								requiredVmDiskReal=$(echo "${voArray[3]} * 1125899906842624" | bc)
+							;;
+
+							TiB|tib )
+								requiredVmDiskReal=$(echo "${voArray[3]} * 1099511627776" | bc)
+							;;
+
+							GiB|gib )
+								requiredVmDiskReal=$(echo "${voArray[3]} * 1073741824" | bc)
+							;;
+
+							MiB|mib )
+								requiredVmDiskReal=$(echo "${voArray[3]} * 1048576" | bc)
+							;;
+
+							KiB|kib )
+								requiredVmDiskReal=$(echo "${voArray[3]} * 1024" | bc)
+							;;
+
+						esac
+						if ssh -o ConnectTimeout=30 -o BatchMode=yes -o HostKeyAlias=$resourcez $( grep -A 3 $resourcez /etc/pve/corosync.conf | grep ring0_addr | awk -F '(: )' '{print $2}' ) "grep -i zfs /proc/cmdline" ## did the potential desination node boot from ZFS today or any other Filesystem? TODO: check also for BTRFS and other weird filesystems
+						then
+        	                #mmmmm mmmmmm  mmmm 
+    	                        #" #      #"   "
+	                          ##   #mmmmm "#mmm 
+	                         #"    #          "#
+	                        ##mmmm #      "mmm#"
+						
+							## Number of things in array	0		1		2		3		4		5		6		7		8		9
+							## Name of those things			name	size	used	free	expandz	frag	capacty	dedup	health	altroot
+							diskArray=($(ssh -o ConnectTimeout=30 -o BatchMode=yes -o HostKeyAlias=$resourcez $( grep -A 3 $resourcez /etc/pve/corosync.conf | grep ring0_addr | awk -F '(: )' '{print $2}' ) "zpool list | grep $(grep ZFS= /proc/cmdline | cut -d' ' -f2 | sed 's/root=ZFS=//' | cut -d'/' -f1)"))
+
+							## Remove all numbers (digits) and periods from ZFS size, so we are left with just a letter
+							## find used size
+							case $(${arra[2]} | sed 's/[[:digit:]].//g') in 
+
+								P|p )
+									usedDiskReal=$(echo "$(echo "${arra[2]}" | sed 's/[[:alpha:]]//') * 1125899906842624" | bc)
+								;;
+
+								T|t )
+									usedDiskReal=$(echo "$(echo "${arra[2]}" | sed 's/[[:alpha:]]//') * 1099511627776" | bc)
+								;;
+
+								G|g )
+									usedDiskReal=$(echo "$(echo "${arra[2]}" | sed 's/[[:alpha:]]//') * 1073741824" | bc)
+								;;
+
+								M|m )
+									usedDiskReal=$(echo "$(echo "${arra[2]}" | sed 's/[[:alpha:]]//') * 1048576" | bc)
+								;;
+
+								K|k )
+									usedDiskReal=$(echo "$(echo "${arra[2]}" | sed 's/[[:alpha:]]//') * 1024" | bc)
+								;;
+
+							esac
+
+							## find free size
+							case $(${arra[3]} | sed 's/[[:digit:]].//g') in 
+
+								P|p )
+									availableDiskReal=$(echo "$(echo "${arra[3]}" | sed 's/[[:alpha:]]//') * 1125899906842624" | bc)
+								;;
+
+								T|t )
+									availableDiskReal=$(echo "$(echo "${arra[3]}" | sed 's/[[:alpha:]]//') * 1099511627776" | bc)
+								;;
+
+								G|g )
+									availableDiskReal=$(echo "$(echo "${arra[3]}" | sed 's/[[:alpha:]]//') * 1073741824" | bc)
+								;;
+
+								M|m )
+									availableDiskReal=$(echo "$(echo "${arra[3]}" | sed 's/[[:alpha:]]//') * 1048576" | bc)
+								;;
+
+								K|k )
+									availableDiskReal=$(echo "$(echo "${arra[3]}" | sed 's/[[:alpha:]]//') * 1024" | bc)
+								;;
+
+							esac
+
+
+							## find total size
+							case $(${arra[1]} | sed 's/[[:digit:]].//g') in 
+
+								P|p )
+									totalDiskReal=$(echo "$(echo "${arra[1]}" | sed 's/[[:alpha:]]//') * 1125899906842624" | bc)
+								;;
+
+								T|t )
+									totalDiskReal=$(echo "$(echo "${arra[1]}" | sed 's/[[:alpha:]]//') * 1099511627776" | bc)
+								;;
+
+								G|g )
+									totalDiskReal=$(echo "$(echo "${arra[1]}" | sed 's/[[:alpha:]]//') * 1073741824" | bc)
+								;;
+
+								M|m )
+									totalDiskReal=$(echo "$(echo "${arra[1]}" | sed 's/[[:alpha:]]//') * 1048576" | bc)
+								;;
+
+								K|k )
+									totalDiskReal=$(echo "$(echo "${arra[1]}" | sed 's/[[:alpha:]]//') * 1024" | bc)
+								;;
+
+							esac
+
+
+							## Now the moment we've all been waiting for: more math. Is this VO too fat for this potential destination node?
+							[[ $( echo "$availableDiskReal - ($totalDiskReal * $diskMarginPercentage / 100) - $requiredVmDiskReal" |
+							bc | ## actual math, before truncating down to an integer for Bash.
+							cut -d'.' -f1 ) -gt 1  ]] && disk=true
+						else
+									 #    #                           mmmmmm  mmmm 
+							 #mm   mm#mm  # mm    mmm    m mm         #      #"   "
+							#" "#    #    #"  #  #"  #   #"  "        #mmmmm "#mmm 
+							#   #    #    #   #  #""""   #            #          "#
+							 #m#     "mm  #   #  "#mm"   #            #      "mmm#"
+							
+							## you're not using ZFS, so I'm assuming it's something simple like EXT or XFS.
+
+							
+							otherFileSystemAvailable=$(ssh -o ConnectTimeout=30 -o BatchMode=yes -o HostKeyAlias=$resourcez $( grep -A 3 $resourcez /etc/pve/corosync.conf | grep ring0_addr | awk -F '(: )' '{print $2}' ) "vgs --noheadings --units b --nosuffix -o lv_size,lv_dmpath --nameprefixes" |
+							grep "LVM2_LV_DM_PATH='/dev/mapper/pve-data'" |
+							cut -d"'" -f2)
+
+							otherFileSystemTotal=$(ssh -o ConnectTimeout=30 -o BatchMode=yes -o HostKeyAlias=$resourcez $( grep -A 3 $resourcez /etc/pve/corosync.conf | grep ring0_addr | awk -F '(: )' '{print $2}' ) "pvdisplay --units b" | grep -A 1 -E 'VG Name.*pve' | tail -n 1 | awk '{print $3}')
+
+							[[ $( echo "$otherFileSystemAvailable - ($otherFileSystemTotal * $diskMarginPercentage / 100) - $requiredVmDiskReal" |
+							bc | ## actual math, before truncating down to an integer for Bash.
+							cut -d'.' -f1 ) -gt 1  ]] && disk=true
+
+						fi ## has enough local disk space
+					
+					else
+						## not locally stored
+						disk=true
+					fi ## local disk?
+
+				if $ram && $cpu && $disk
+				then
 					## ok to migrate
+					printf "\n\n\n"
 					/usr/bin/pvesh --nooutput create "/nodes/localhost/qemu/$qemuRemaining/migrate" --online --with-local-disks --target "$resourcez"
 					break
 					## break this loop looking for nodes, and continue the parent loop looking for VMs that need migration
 				else
 					## not enough spare resources.
-					echo "$(echo "($maxRamReal * $ramFillLine - $usedRamReal) * 1048576" | bc ) MiB of available RAM is apparently not enough on $resourcez to accept QEMU $lxcRemaining with its needed $qemuMaxRam MiB of RAM."
-					echo "Or maybe $resourcez was using more than $cpuFillLine of its CPU? It was at ${resourceArray[0]} when I checked."
+					echo "$(echo "($maxRamReal * $ramFillLine - $usedRamReal) / 1048576" | bc ) MiB of available RAM is apparently not enough on $resourcez to accept QEMU $lxcRemaining with its needed $qemuMaxRam MiB of RAM."
+					echo "Or maybe $resourcez was using more than $cpuFillLine% of its CPU? It was at ${resourceArray[0]} when I checked."
+					echo "It could also be that the $( echo "$requiredVmDiskReal / 1073741824" | bc) GiB disk was too big for the available space of $( echo "$availableDiskReal / 1073741824" | bc) GiB."
+					echo "now that I think about it:"
+					if $ram ; then echo "The RAM was ok" ; fi
+					if $cpu ; then echo "The CPU was ok" ; fi
+					if $disk ; then echo "The Disk was ok" ; fi
 					echo "Either way, I'm going to look for another node to migrate to."
 				fi
 
@@ -396,12 +827,13 @@ else
 
 	printf "\n\n\n"
 	echo "Looking for in-progress migrations to or from this node..."
-	sleep 40
+	sleep 30
 	while ps aux |
 	grep -v grep |
-	grep -E "((zfs )(recv)|(send))|(/usr/bin/perl /usr/sbin/pvesm import)"
+	grep -E "((zfs )(recv)|(send))|(/usr/bin/perl /usr/sbin/pvesm import)|(ssh.*HostKeyAlias=.*ExitOnForwardFailure=yes.*-L /run.*migrate.*tunnel)|(ssh.*HostKeyAlias=.*pvesr)|(ssh.*HostKeyAlias=.*pct st)|(task UPID:.*:qmigrate:.*:root@pam:)" ||
+	pvesh get /cluster/ha/status/current --noborder --noheader | grep migrate
 	do
-		sleep 5
+		sleep 15
 		echo "Still migrating stuff"
 	done
 	sleep 20
@@ -419,6 +851,12 @@ else
 		safeToReboot=true
 	fi
 fi
+                   #         m    m m    m       
+  #mm   m mm    mmm#         "m  m" ##  ##  mmm  
+ #"  #  #"  #  #" "#          #  #  # ## # #   " 
+ #""""  #   #  #   #          "mm"  # "" #  """m 
+  #mm"  #   #  "#m##           ##   #    # "mmm" 
+
 
 
 
@@ -430,12 +868,27 @@ printf "\n\n\n"
 echo "Updating, finally"
 if $safeToReboot
 then
-	apt update &&
-	apt upgrade -y &&
-	exit 0 ## passing back to Ansible for a reboot
+	## Thanks to Robert Oliver for the apt-get install line
+	## https://linuxhint.com/debian_frontend_noninteractive/
+	apt-get update &&
+	DEBIAN_FRONTEND=noninteractive apt-get dist-upgrade -q -y \
+	-o Dpkg::Options::="--force-confdef" \
+	-o Dpkg::Options::="--force-confold" &&
+	shutdown -r +1
+
+	echo "I assume everything has worked perfectly. I'm gonna reboot in one minute, but first lemme hand this back to Ansible."
+
+	exit 0 ## passing back to Ansible
 else
-	echo "$(hostname) is still hosting Virtual Objects, so I'm not going to update or reboot."
+	echo "$(hostname) is still hosting Virtual Objects so I am not going to update or reboot."
 	exit 1
 fi
 
 ## go onto next node
+
+
+echo "this line should be logically impossible to run, so since it has... know this script is messed up somehow. I am 
+$(pwd -P)/$0)
+The time is
+$(date)"
+exit 1
