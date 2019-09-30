@@ -7,6 +7,16 @@
 #   raw: export PYTHONUNBUFFERED=1
 
 
+
+## Yes it would be "more correct" to have Ansible do all this work instead of Bash,
+## but Ansible is running in a VM on the cluster is some times updates, 
+## and I'm nervous about the migrater migrating itself.
+## This combination of Ansible and Bash is, in terms of stability, the best of both:
+## Bash is running directly from the hypervisor while Ansible itself is at the highest
+## risk of interuption and then Ansible takes back over to reboot that hypervisor and
+## move onto another while the hypervisor is at its greatest risk of interuption. 
+## Oh: also I don't know how to do this in Ansbile, so I fell back to Bash which I know more of.
+## Does Ansible even /have/ nestable while loops?
 - name: Copy update script to Proxmox Box
   become: yes
   copy:
@@ -14,7 +24,7 @@
     src: on_box_migrate_and_update.sh
     force: yes # replace old script
     remote_src: no
-    checksum: d33d0233b111b4d9433ea83f1d2c3f03919b517c # SHA1
+    checksum: cd79720540bbc8020b2379c5d8d30d8121fad9a3 # SHA1
     decrypt: no
     group: root
     unsafe_writes: no
@@ -40,14 +50,17 @@
 ## I hope I'm invoking the HostKeyAlias option in a way that works and bypasses "fist time connecting" prompt.
 ## You know, I could probably instal tmux and run this inside that, instead of using ssh which is already instaled...
 - name: Run the testing, migration, and updates in Bash
+  register: on_box_migrate_and_update
   become: yes
-  raw: /usr/bin/ssh -t localhost -o HostKeyAlias='{{origional_name}}' "/bin/bash -c /root/scripts/on_box_migrate_and_update.sh" # > /root/scripts/on_box_migrate_and_update.sh.log"
+  raw: /usr/bin/ssh -t localhost -o HostKeyAlias='{{origional_name}}' "/bin/bash -c /root/scripts/on_box_migrate_and_update.sh | tee /root/scripts/on_box_migrate_and_update.sh.log"
+  failed_when: "'is still hosting Virtual Objects so I am not going to update or reboot' in on_box_migrate_and_update.stdout"
+  changed_when: "'The following packages will be upgraded' in on_box_migrate_and_update.stdout"
 #  failed_when: diff_cmd.rc > 101 or diff_cmd.rc < 101 ## don't fail when you lose connection to the host; that means a reboot happened and everything is going according to plan.
 
 
-- name: reboot without using Ansible
-  become: yes
-  raw: PATH=/sbin:/usr/sbin:$PATH ; shutdown -r +1
+# - name: reboot without using Ansible, 1 minute from now
+#   become: yes
+#   raw: PATH=/sbin:/usr/sbin:$PATH ; shutdown -r +1
 
 
 - name: wait 5 minutes or longer for the reboot to finish
